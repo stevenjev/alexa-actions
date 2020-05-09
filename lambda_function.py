@@ -1,8 +1,9 @@
-## VERSION 0.3
+## VERSION 0.3-beta
 
 import logging
 import urllib3
 import json
+import isodate #Necessary to parse the time
 
 import ask_sdk_core.utils as ask_utils
 from ask_sdk_core.skill_builder import SkillBuilder
@@ -174,6 +175,39 @@ class NoIntentHanlder(AbstractRequestHandler):
                 .response
         )
 
+ 
+class TimeIntentHandler(AbstractRequestHandler):
+    """Handler for GetTimeIntent."""
+    def can_handle(self, handler_input):
+        # type: (HandlerInput) -> bool
+        return ask_utils.is_intent_name("TimeIntent")(handler_input)
+
+    def handle(self, handler_input):
+        # type: (HandlerInput) -> Response
+        
+        global home_assistant_object
+        if home_assistant_object == None:
+            home_assistant_object = HomeAssistant(handler_input)
+            home_assistant_object.get_ha_state()
+        
+        try:    
+            rawTime = get_slot_value(handler_input=handler_input,slot_name="getTime"); #Get the time in ISO8061 duration format
+            parsedTime = format(isodate.parse_duration(rawTime)) #Parse the time into datetime format
+            home_assistant_object.post_ha_event(parsedTime) #Send the parsed time back to Home Assistant
+            speak_output = "Okay" #Respond, Okay
+            
+        except:
+            speak_output = "Sorry, I couldn't understand that time." #Catch if the time fails to parse correctly
+        
+        
+        return (
+            handler_input.response_builder
+                .speak(speak_output)
+                # .ask("add a reprompt if you want to keep the session open for the user to respond")
+                .response
+        )
+
+    
 class HelpIntentHandler(AbstractRequestHandler):
     """Handler for Help Intent."""
     
@@ -291,6 +325,7 @@ sb = SkillBuilder()
 sb.add_request_handler(LaunchRequestHandler())
 sb.add_request_handler(YesIntentHanlder())
 sb.add_request_handler(NoIntentHanlder())
+sb.add_request_handler(TimeIntentHandler())
 sb.add_request_handler(HelpIntentHandler())
 sb.add_request_handler(CancelOrStopIntentHandler())
 sb.add_request_handler(SessionEndedRequestHandler())
